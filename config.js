@@ -12,5 +12,11 @@ window.STUDYFLOW_CONFIG = {
   minimumAge: 13,
 
   // Flo's AI features (assistant, quizzes, reading files, marking). Needs the "ai" server function and an API key.
-  aiEnabled: false
+  aiEnabled: false,
+  // Where Flo's AI server runs (Cloudflare Worker, free tier).
+  aiUrl: "AI_URL_HERE",
+  // Draft marking (IA/EE/TOK) stays off until a stronger AI model is connected.
+  markingEnabled: false,
+  // Reading photos needs a vision model; off for now.
+  photosEnabled: false
 };

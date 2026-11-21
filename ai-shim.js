@@ -7,7 +7,7 @@
   "use strict";
   window.SF_WEB = true;
   const CFG = window.STUDYFLOW_CONFIG || {};
-  const fnUrl = () => `${CFG.supabaseUrl}/functions/v1/ai`;
+  const fnUrl = () => CFG.aiUrl || `${CFG.supabaseUrl}/functions/v1/ai`;
 
   function mergeTurns(input) {
     const turns = typeof input === "string" ? [{ role: "user", content: input }] : input.map(t => ({ role: t.role, content: t.content }));
