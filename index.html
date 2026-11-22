@@ -680,7 +680,7 @@ details.alt[open] summary{margin-bottom:14px}
 .cheat h2{font-size:15px;margin:14px 0 6px;font-family:var(--f-body);font-weight:700}
 .sub-acts button:last-child:nth-child(odd){grid-column:1/-1}
 .plus-tag{display:inline-block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:999px;background:linear-gradient(135deg,var(--lamp),color-mix(in srgb,var(--lamp) 50%,#ff6aa2));color:#1a1206;vertical-align:middle;margin-left:4px}
-.plusgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px}
+.plusgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:10px}.no-mark .plusgrid{grid-template-columns:1fr}
 .plusc{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;align-items:center;text-align:left;cursor:pointer;border:1px solid var(--line);border-radius:20px;padding:16px;color:var(--ink);background:radial-gradient(120% 160% at 100% 0%,var(--lamp-glow),transparent 60%),var(--panel);transition:transform .15s,border-color .2s}
 .plusc:hover{transform:translateY(-2px);border-color:var(--lamp)}
 .plusc i{grid-row:span 2;font-style:normal;width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:var(--raised);color:var(--lamp);font-size:18px}
@@ -1201,6 +1201,8 @@ function dayFixed(date){
   }
   state.commitments.forEach(c => {
     if (!c.days.includes(dow) || exc.some(e => e.ref === c.id)) return;
+    const sb = out.find(o => o.kind === "school");
+    if (sb && /^(school|classes|work)$/i.test((c.title || "").trim())) { sb.start = tm(c.start); sb.end = tm(c.end); schoolEnd = sb.end; return; }
     add({kind:"commit", title:c.title, start:tm(c.start), end:tm(c.end), ref:c.id});
     if (F.recover && (c.type === "sport" || c.type === "gym")) add({kind:"break", title:"Recover", start:tm(c.end), end:tm(c.end)+30, soft:true});
   });
@@ -1266,7 +1268,7 @@ function plan(){
       intervals = split.sort((a, b) => overlap(b, pk0, pk1) - overlap(a, pk0, pk1) || Math.abs(a[0] - pk0) - Math.abs(b[0] - pk0));
     }
     const en = date === t0 ? state.energy[date] : null;
-    let cap = (weekend ? P.weekendMax : P.maxStudy) * 60 * (en === "low" ? .6 : en === "high" ? 1.15 : 1);
+    let cap = Math.min(weekend ? P.weekendMax : P.maxStudy, weekend ? 8 : 6) * 60 * (en === "low" ? .6 : en === "high" ? 1.15 : 1);
     if (tasks.some(t => t.boost && date <= t.due && remaining[t.id] > 0)) cap += 60;
     const sessLen = en === "low" ? Math.min(30, focus) : focus;
     let dayStudy = state.log.filter(l => l.date === date && l.kind === "study").reduce((a,l) => a + l.end - l.start, 0);
@@ -1397,7 +1399,7 @@ function viewWeek(){
   let g = `<div class="corner"></div>`;
   days.forEach((date, i) => {
     const d = pd(date), list = blocksFor(date), st = list.filter(b => b.kind === "study" && !b.gone).reduce((a,b) => a + b.end - b.start, 0);
-    const cap = ((d.getDay() === 0 || d.getDay() === 6) ? P.weekendMax : P.maxStudy) * 60, dues = dueOn(date);
+    const wk = d.getDay() === 0 || d.getDay() === 6, cap = Math.min(wk ? P.weekendMax : P.maxStudy, wk ? 8 : 6) * 60, dues = dueOn(date);
     g += `<div class="colhead ${date === t0 ? "today" : ""} ${i === activeDay ? "active" : ""}"><div class="dow">${DOW[d.getDay()]}</div><div class="dn">${d.getDate()}</div><div class="load"><b style="width:${Math.min(100, st/Math.max(cap,1)*100)}%"></b></div><div class="loadtxt">${st ? hrs(st) + " study" : date < t0 ? "" : "Rest"}</div>${dues.slice(0, 2).map(x => `<span class="duechip" title="Due: ${esc(x.title)}">${esc(x.title)}</span>`).join("")}${dues.length > 2 ? `<span class="duechip">+${dues.length - 2} more</span>` : ""}</div>`;
   });
   g += `<div class="hours" style="height:${H}px">` + [...Array(endH - startH)].map((_, k) => k ? `<span class="mono" style="top:${k*60*PX}px">${fmtS((startH+k)*60)}</span>` : "").join("") + `</div>`;
@@ -1512,7 +1514,7 @@ function fallbackCopy(text){ showModal(`<div class="label">Copy for Reminders</d
 /* ================= Today: the calm home ================= */
 function briefFacts(){
   const t0 = todayStr(), now = nowMin(), P = state.profile, f = [];
-  const left = (PLAN.byDay[t0] || []).filter(b => b.kind === "study" && !b.done && b.end > now);
+  const left = (PLAN.byDay[t0] || []).filter(b => b.kind === "study" && !b.done && b.end > now).sort((a, b) => a.start - b.start);
   f.push(left.length ? `${left.length} study session${left.length > 1 ? "s" : ""} left today (${hrs(left.reduce((a,b) => a + b.end - b.start, 0))}), starting with ${left[0].title} at ${fmt(left[0].start)}` : "no more study today");
   const d = state.tasks.filter(t => dueOn(t.due).includes(t) && t.due >= t0 && t.due <= addDs(t0, 7)).sort((a,b) => a.due.localeCompare(b.due))[0];
   if (d) f.push(`${d.title} is ${rel(d.due)}, ${readiness(d)}% of the prep done${(PLAN.shortfall[d.id] || 0) > 10 ? `, still ${hrs(PLAN.shortfall[d.id])} short` : ", and the rest is planned"}`);
@@ -1716,8 +1718,8 @@ function openSettings(){
   const P = state.profile;
   showModal(`<div class="label">Study settings</div><h2>How much, and when</h2>
     <div class="fields">
-      <div class="f"><label for="s-max">Study on school days (hours)</label><input id="s-max" type="number" min="0.5" max="12" step="0.5" value="${P.maxStudy}"></div>
-      <div class="f"><label for="s-wmax">On weekends (hours)</label><input id="s-wmax" type="number" min="0" max="12" step="0.5" value="${P.weekendMax}"></div>
+      <div class="f"><label for="s-max">Study on school days (hours)</label><input id="s-max" type="number" min="0.5" max="6" step="0.5" value="${P.maxStudy}"></div>
+      <div class="f"><label for="s-wmax">On weekends (hours)</label><input id="s-wmax" type="number" min="0" max="8" step="0.5" value="${P.weekendMax}"></div>
       <div class="f"><label for="s-peak">Best focus time</label><select id="s-peak">${Object.entries(PEAKS).map(([k,v]) => `<option value="${k}" ${k === P.peak ? "selected" : ""}>${v[2]}</option>`).join("")}</select></div>
       <div class="f"><label for="s-len">Session length</label><select id="s-len">${[25,45,60,90].map(m => `<option value="${m}" ${m === P.focusLen ? "selected" : ""}>${m} minutes</option>`).join("")}</select></div>
     </div>
@@ -3273,7 +3275,7 @@ const OB = [
   {id:"rhythm", q:() => "How does your brain like to work?", sub:() => "This decides when your hardest subjects go and how long each session lasts.",
    body:d => { const sh = suggestedHours(d); return `<div class="flabel">When are you sharpest?</div><div class="opt">${Object.entries(PEAKS).map(([k,v]) => `<button data-ob="peak" data-v="${k}" aria-pressed="${d.peak === k}"><b>${v[2]}</b><span>${fmtS(v[0])}–${fmtS(v[1] % 1440)}</span></button>`).join("")}</div>
      <div class="flabel">How long can you focus before your mind drifts?</div><div class="opt">${[[25,"About 20 minutes","25-min sprints, 5-min breaks"],[45,"Around 45 minutes","45-min sessions, 10-min breaks"],[90,"An hour or more","90-min deep work, 15-min breaks"]].map(([m,a,b]) => `<button data-ob="len" data-v="${m}" aria-pressed="${d.focusLen === m}"><b>${a}</b><span>${b}</span></button>`).join("")}</div>
-     <div class="fields"><div class="f"><label for="ob-max">Study on school days (hours)</label><input id="ob-max" type="number" min="0.5" max="12" step="0.5" value="${d.maxStudy ?? sh.weekday}"></div><div class="f"><label for="ob-wmax">On weekends</label><input id="ob-wmax" type="number" min="0" max="12" step="0.5" value="${d.weekendMax ?? sh.weekend}"></div></div>
+     <div class="fields"><div class="f"><label for="ob-max">Study on school days (hours)</label><input id="ob-max" type="number" min="0.5" max="6" step="0.5" value="${d.maxStudy ?? sh.weekday}"></div><div class="f"><label for="ob-wmax">On weekends</label><input id="ob-wmax" type="number" min="0" max="8" step="0.5" value="${d.weekendMax ?? sh.weekend}"></div></div>
      <p class="muted" style="font-size:13px">Suggested for ${esc(yearLabel(d) || "you")} with a ${d.focus} focus: ${hrs(sh.weekday*60)} on school days, ${hrs(sh.weekend*60)} on weekends.</p>`; },
    read:d => { const sh = suggestedHours(d), a = Number($("#ob-max").value), b = Number($("#ob-wmax").value); d.maxStudy = a && a !== sh.weekday ? a : null; d.weekendMax = b !== sh.weekend ? b : null; return true; }},
   {id:"coming", q:() => "Anything coming up soon?", sub:() => "Tests, deadlines, presentations. Describe them and I'll plan the prep. You can drop in documents later too.",

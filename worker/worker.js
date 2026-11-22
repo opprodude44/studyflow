@@ -12,7 +12,8 @@ const SAFETY = `You are Flo, the study assistant inside StudyFlow, a study plann
 - Never write graded work (IA, EE, essays, coursework) for the student: explain, give feedback and examples instead.
 - If a student seems distressed or at risk, respond kindly, encourage them to talk to a trusted adult or school counsellor, and in an emergency to call local emergency services (999 in the UAE).
 - Don't ask for personal information such as addresses, phone numbers or passwords.
-- Be accurate. If you're not sure, say so.`;
+- Be accurate. If you're not sure, say so.
+- NEVER say you added, moved, deleted, scheduled, changed or marked anything unless a tool result in this conversation confirms it. If you can't do something, say so plainly and suggest how the student can do it.`;
 
 function cors(origin) {
   const ok = ALLOWED_ORIGINS.includes(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin || "");
@@ -21,6 +22,14 @@ function cors(origin) {
 const json = (body, status, origin) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...cors(origin) } });
 
 function toText(content) {
+  if (Array.isArray(content) && content.some(b => b.type === "tool_use")) {
+    const t = content.filter(b => b.type === "text").map(b => b.text).join("\n");
+    const calls = content.filter(b => b.type === "tool_use").map(b => `[I called ${b.name} with ${JSON.stringify(b.input || {})}]`).join("\n");
+    return [t, calls].filter(Boolean).join("\n");
+  }
+  if (Array.isArray(content) && content.some(b => b.type === "tool_result")) {
+    return "Tool results (these are what actually happened):\n" + content.filter(b => b.type === "tool_result").map(b => `- ${b.is_error ? "FAILED: " : ""}${typeof b.content === "string" ? b.content : JSON.stringify(b.content)}`).join("\n") + "\nNow reply to the student in 1-3 short sentences, saying only what the tool results confirm.";
+  }
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content.map(b => b.type === "text" ? b.text : b.type === "tool_result" ? `Result: ${typeof b.content === "string" ? b.content : JSON.stringify(b.content)}` : "").filter(Boolean).join("\n");
@@ -48,15 +57,32 @@ export default {
     if (raw.length > 120000) return json({ error: "Too much text" }, 413, origin);
     if (raw.includes('"type":"image"')) return json({ error: "Reading photos is coming soon. Paste the text instead." }, 400, origin);
 
-    const msgs = (Array.isArray(body.messages) ? body.messages : []).map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: toText(m.content).slice(0, 60000) })).filter(m => m.content);
+    let msgs = (Array.isArray(body.messages) ? body.messages : []).map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: toText(m.content).slice(0, 40000) })).filter(m => m.content);
+    // The model reads about 24k tokens, so keep the newest messages within ~60k characters.
+    let total = 0; const kept = [];
+    for (let i = msgs.length - 1; i >= 0; i--) { total += msgs[i].content.length; if (total > 60000 && kept.length) break; kept.unshift(msgs[i]); }
+    msgs = kept;
+    const last = body.messages?.[body.messages.length - 1];
+    const afterTools = Array.isArray(last?.content) && last.content.some(b => b.type === "tool_result");
+    const tools = !afterTools && Array.isArray(body.tools) && body.tools.length ? body.tools.slice(0, 12).map(t => ({ name: t.name, description: String(t.description || "").slice(0, 600), parameters: t.input_schema || { type: "object", properties: {} } })) : null;
     if (!msgs.length) return json({ error: "Bad request" }, 400, origin);
     const system = SAFETY + (body.json ? "\nReply with ONLY valid JSON, no other text and no code fences." : "\nKeep replies short and clear. Use simple Markdown when it helps.");
     const model = MODELS[body.tier] || MODELS.default;
     try {
-      const out = await env.AI.run(model, { messages: [{ role: "system", content: system }, ...msgs], max_tokens: body.json ? 2048 : 1024, temperature: 0.4 });
-      const text = typeof out?.response === "string" ? out.response : typeof out?.response === "object" ? JSON.stringify(out.response) : "";
-      if (!text) return json({ error: "No answer" }, 502, origin);
-      return json({ content: [{ type: "text", text }], stop_reason: "end_turn" }, 200, origin);
+      const input = { messages: [{ role: "system", content: system + (tools ? "\nYou can change the student's plan with the tools provided. Use a tool when they ask for a change; otherwise just answer." : "") }, ...msgs], max_tokens: body.json ? 2048 : 1024, temperature: 0.3 };
+      if (tools) input.tools = tools;
+      const out = await env.AI.run(tools ? MODELS.default : model, input);
+      const calls = Array.isArray(out?.tool_calls) ? out.tool_calls : [];
+      const content = [];
+      const text = typeof out?.response === "string" ? out.response.trim() : out?.response && typeof out.response === "object" ? JSON.stringify(out.response) : "";
+      if (text) content.push({ type: "text", text });
+      calls.slice(0, 4).forEach((c, i) => {
+        const name = c.name || c.function?.name; let args = c.arguments ?? c.function?.arguments ?? {};
+        if (typeof args === "string") { try { args = JSON.parse(args); } catch { args = {}; } }
+        if (name && tools?.some(t => t.name === name)) content.push({ type: "tool_use", id: `tu_${Date.now()}_${i}`, name, input: args || {} });
+      });
+      if (!content.length) return json({ error: "No answer" }, 502, origin);
+      return json({ content, stop_reason: content.some(c => c.type === "tool_use") ? "tool_use" : "end_turn" }, 200, origin);
     } catch (e) {
       const msg = String(e?.message || e);
       if (/limit|quota|neuron|429/i.test(msg)) return json({ error: "Flo is very busy today. Try again tomorrow." }, 429, origin);
