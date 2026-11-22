@@ -735,6 +735,14 @@ details.alt[open] summary{margin-bottom:14px}
 .dockpick .mini i{position:absolute;background:var(--lamp);border-radius:4px}
 .no-ai [data-act="marker"],.no-ai [data-act="exnew"],.no-ai [data-act="exhard"],.no-ai [data-act="teach"],.no-ai [data-act="cheat"],.no-ai [data-act="evequiz"],.no-ai [data-act="quizsubj"],.no-ai [data-act="subnotes"],.no-ai [data-plus="mark"],.no-ai .plus-tag{display:none!important}
 .no-mark [data-act="marker"],.no-mark [data-plus="mark"],.no-mark [data-flo="mark"],.no-photo [data-plus="photo"],.no-photo [data-act="exphoto"]{display:none!important}
+.dayprog{display:flex;align-items:center;gap:12px;margin:10px 0 4px}
+.dp-bar{position:relative;flex:1;height:8px;border-radius:99px;background:var(--raised);overflow:hidden}
+.dp-bar b{position:absolute;inset:0 auto 0 0;border-radius:99px;background:linear-gradient(90deg,var(--lamp),color-mix(in srgb,var(--lamp) 60%,#ff6aa2));transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.dp-bar i{position:absolute;top:0;bottom:0;width:2px;background:var(--bg);opacity:.7}
+.dp-bar i:last-child{display:none}
+.dayprog span{font-size:13px;color:var(--ink-2);white-space:nowrap}.dayprog span b{color:var(--ink)}
+.dayprog.all .dp-bar b{background:var(--mint)}
+@media(max-width:560px){.dayprog{flex-direction:column;align-items:stretch;gap:6px}}
 .you-legal{margin-top:18px;text-align:center}.you-legal a{color:var(--ink-2)}
 .lib .sect{margin-top:26px}.lib .sect h3{margin:0 0 10px}
 .lib .page-h h1{font-family:var(--f-display);font-size:clamp(24px,4vw,34px);margin:4px 0 0;line-height:1.1}
@@ -1983,6 +1991,13 @@ function drawTour(){
 function maybeTour(){ if (!state.tourDone && tourStep < 0 && view === "today" && !$("#overlay").innerHTML) setTimeout(() => { if (!state.tourDone && tourStep < 0 && !$("#overlay").innerHTML) startTour(); }, 700); }
 
 /* ================= v8: streaks and badges, grade forecast, snap homework, study together, progress report ================= */
+function dayProgress(){
+  const t0 = todayStr(), bs = (PLAN.byDay[t0] || []).filter(b => b.kind === "study");
+  if (!bs.length) return "";
+  const tot = bs.reduce((a, b) => a + b.end - b.start, 0), done = bs.filter(b => b.done), dm = done.reduce((a, b) => a + b.end - b.start, 0), pct = Math.round(dm / tot * 100);
+  const all = done.length === bs.length;
+  return `<div class="dayprog ${all ? "all" : ""}" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Today's study progress"><div class="dp-bar"><b style="width:${Math.max(pct, 2)}%"></b>${bs.map((b, i) => `<i style="left:${Math.round(bs.slice(0, i + 1).reduce((a, x) => a + x.end - x.start, 0) / tot * 100)}%"></i>`).join("")}</div><span>${all ? "🎉 Day complete. Nice work." : `<b>${done.length}</b> of ${bs.length} sessions · ${hrs(dm)} of ${hrs(tot)}`}</span></div>`;
+}
 function streakDays(){
   const t0 = todayStr(), studied = d => state.log.some(l => l.kind === "study" && l.date === d);
   let n = 0, lastMiss = -99, i = studied(t0) ? 0 : 1;
@@ -2369,6 +2384,7 @@ function viewToday(){
   const speak = "speechSynthesis" in window ? `<button class="spk" data-act="speak" aria-label="Read it aloud">🔊</button>` : "";
   return `<div class="today">
     <div class="t-head"><div><div class="label">${DOWL[new Date().getDay()]} ${new Date().getDate()} ${MONL[new Date().getMonth()]}</div><h1>${greeting()}</h1></div><button class="lvl" data-act="badges" aria-label="Level and badges"><span>Lv ${level()}</span><i style="--w:${Math.round(((state.xp || 0) - lvlFloor(level())) / (lvlFloor(level() + 1) - lvlFloor(level())) * 100)}%"></i>${streakDays() ? `<small>${streakDays()}-day streak</small>` : ""}</button></div>
+    ${dayProgress()}
     <div class="flo-brief"><span data-live>${flo(floMood(), 62)}</span><div class="bubble"><p id="briefText">${esc(briefText())}</p><div class="fchips">${floChips().map(([k, l, id]) => `<button data-flo="${k}" ${id ? `data-id="${esc(id)}"` : ""}>${esc(l)}</button>`).join("")}${speak}</div></div></div>
     ${eveHtml()}
     ${hero}
