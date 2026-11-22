@@ -14,7 +14,7 @@ window.STUDYFLOW_CONFIG = {
   // Flo's AI features (assistant, quizzes, reading files, marking). Needs the "ai" server function and an API key.
   aiEnabled: true,
   // Where Flo's AI server runs (Cloudflare Worker, free tier).
-  aiUrl: "https://studyflow-ai.jaindev407.workers.dev",
+  aiUrl: "https://studyflow-ai.studyflow-app.workers.dev",
   // Draft marking (IA/EE/TOK) stays off until a stronger AI model is connected.
   markingEnabled: false,
   // Reading photos needs a vision model; off for now.
