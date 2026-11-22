@@ -1,48 +1,55 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>StudyFlow Privacy Policy</title>
+<meta name="description" content="How StudyFlow collects, uses and protects your information.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <style>
 :root{--bg:#F5F3F8;--fg:#1B1724;--muted:#5C556E;--accent:#B35A00;--line:#E1DCE9}
 @media (prefers-color-scheme:dark){:root{--bg:#100E15;--fg:#F2EEF8;--muted:#ACA4BB;--accent:#FFB648;--line:#2D2839}}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,sans-serif}
 main{max-width:68ch;margin:0 auto;padding:40px 20px 80px}
 h1{font-size:30px;margin:0 0 6px}h2{font-size:19px;margin:28px 0 6px}
-.draft{border:1px dashed var(--accent);color:var(--accent);border-radius:10px;padding:10px 14px;font-size:14px}
+.note{border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:14px;color:var(--muted)}
 p,li{color:var(--fg)}small{color:var(--muted)}a{color:var(--accent)}
 </style></head><body><main>
-<p class="draft">StudyFlow is in beta. This page will be reviewed before the full launch.</p>
-<h1>Privacy Policy</h1><small>Last updated: 21 November 2026</small>
+<p><a href="./">← Back to StudyFlow</a></p>
+<h1>Privacy Policy</h1><small>Last updated: 22 November 2026</small>
+<p class="note">StudyFlow is in beta. We'll keep this page up to date as it grows, and tell you in the app about any important change.</p>
 
 <h2>Who we are</h2>
-<p>StudyFlow is run by a student developer in Dubai, UAE. Contact email: coming soon.</p>
+<p>StudyFlow is an independent study planner, built and run by a student developer in Dubai, UAE. To ask a question about your data, use <b>Send feedback</b> on the You page in StudyFlow.</p>
 
 <h2>What we collect</h2>
 <ul>
-<li><b>Account details:</b> your email address, first name, birth year, and how you signed in (email, Google, Microsoft or Apple).</li>
-<li><b>Your plan:</b> the answers you give during setup (school, subjects, grades, activities, routine), deadlines, study sessions, quiz results and chats with the assistant.</li>
-<li><b>Files you add:</b> text read from documents, calendar files and screenshots you upload, so they can be used for your plan and notes.</li>
-<li><b>AI usage:</b> how many AI requests you make each day, to apply fair-use limits.</li>
+<li><b>Account details:</b> your email address, first name and birth year.</li>
+<li><b>Your plan:</b> the answers you give during setup (curriculum, subjects, target grades, activities and routine), your deadlines, study sessions, quiz and flashcard results, and your chats with Flo.</li>
+<li><b>Material you add:</b> text read from files you upload, web pages you add by link, and calendar files or links you connect.</li>
+<li><b>Usage:</b> how many AI requests you make each day, so we can apply fair-use limits, and any feedback you send us.</li>
 </ul>
+<p>We don't collect your location, contacts or anything from your device that you don't add yourself.</p>
 
 <h2>How we use it</h2>
-<p>Only to run StudyFlow for you: building and updating your timetable, generating notes and quizzes, and keeping your plan in sync across your devices. We do not sell your data or use it for advertising.</p>
+<p>Only to run StudyFlow for you: building and updating your timetable, answering your questions, making notes, quizzes and flashcards, and keeping your plan in sync across your devices. We don't sell your data, show ads, or use your data to train AI models.</p>
 
-<h2>Who we share it with</h2>
+<h2>Services that process your data</h2>
 <ul>
 <li><b>Supabase</b> stores your account and plan (servers in Tokyo, Japan).</li>
-<li>StudyFlow's AI features are not switched on yet. Before they are, we'll update this page to explain which AI provider processes what you send to it.</li>
-<li>Hosting: GitHub Pages (GitHub).</li>
+<li><b>Cloudflare</b> runs StudyFlow's server. When you use Flo, the text needed to answer (your message, relevant parts of your plan and any material you've added) is sent to Cloudflare Workers AI, which runs the open AI model that writes the reply. When you add a web page or calendar link, Cloudflare fetches it for you.</li>
+<li><b>GitHub Pages</b> hosts the website itself.</li>
 </ul>
 
+<h2>Flo, the AI</h2>
+<p>Flo is an AI, not a person. It can make mistakes, so check important facts with your teacher or textbook. Flo won't write coursework (such as an IA, Extended Essay or TOK essay) for you.</p>
+
 <h2>Students under 18</h2>
-<p>StudyFlow is for students aged 13 and over. If you're under 18, please check with a parent or guardian before signing up. Parents can contact us (contact email coming soon) to see or delete their child's data.</p>
+<p>StudyFlow is for students aged 13 and over. If you're under 18, please check with a parent or guardian before signing up. A parent or guardian can ask us to see or delete their child's data through <b>Send feedback</b>, or the student can delete the account at any time.</p>
 
 <h2>Your choices</h2>
-<p>You can change your answers at any time in StudyFlow. You can delete your account from the You page, which permanently deletes your plan, quizzes, chats and uploaded text.</p>
+<p>You can change your answers at any time. You can permanently delete your account from the You page (Account → Delete account). This removes your plan, quizzes, chats, files and linked calendars.</p>
 
 <h2>Keeping it safe</h2>
-<p>Your plan is stored so that only your account can read it. Connections are encrypted. The AI key and other secrets stay on our servers.</p>
+<p>Your plan is stored so that only your account can read it, and connections are encrypted. Secret keys stay on our servers and are never sent to your browser.</p>
 
 <h2>Changes</h2>
-<p>If we change this policy we'll update the date above and tell you in the app.</p>
+<p>If we change this policy, we'll update the date above and tell you in the app.</p>
 </main></body></html>

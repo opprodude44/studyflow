@@ -42,10 +42,14 @@
     },
     async deleteAccount() {
       const session = await this.getSession(); if (!session) return;
-      const res = await fetch(`${CFG.supabaseUrl}/functions/v1/delete-account`, { method: "POST", headers: { Authorization: `Bearer ${session.access_token}`, apikey: CFG.supabaseAnonKey } });
-      if (!res.ok) throw new Error("delete failed");
+      const { error } = await sb.rpc("delete_my_account");
+      if (error) throw error;
       try { localStorage.removeItem("studyflow.v2:" + this.user.id); } catch (e) {}
       await sb.auth.signOut(); location.reload();
+    },
+    async sendFeedback(message, kind) {
+      const { error } = await sb.from("feedback").insert({ message: String(message).slice(0, 4000), kind, page: String(window.view || "").slice(0, 50) });
+      if (error) throw error;
     },
     meta() { return this.user?.user_metadata || {}; },
     providerLabel() { const p = this.user?.app_metadata?.provider; return p === "google" ? "Google" : p === "azure" ? "Microsoft" : p === "apple" ? "Apple" : "email and password"; }
@@ -72,8 +76,8 @@
   /* ---------- screens ---------- */
   let mode = "signup", msg = null, busy = false, recovering = /type=recovery/.test(location.hash);
   const host = () => $("#auth");
-  function show(html) { host().hidden = false; host().innerHTML = `<div class="auth-in"><div class="logo"><i></i>StudyFlow</div>${html}</div>`; }
-  function hide() { host().hidden = true; host().innerHTML = ""; }
+  function show(html) { host().hidden = false; host().classList.remove("is-landing"); host().scrollTop = 0; host().innerHTML = `<div class="auth-in"><div class="logo"><i></i>StudyFlow</div>${html}</div>`; }
+  function hide() { host().hidden = true; host().classList.remove("is-landing"); host().innerHTML = ""; }
   const errMsg = e => {
     const m = String(e?.message || e || "");
     if (/Invalid login credentials/i.test(m)) return "That email and password don't match. Try again, or reset your password.";
@@ -111,8 +115,68 @@
         <button type="button" class="linkbtn" id="a-magic" style="align-self:center">Email me a sign-in link instead</button>
       </div>
       <div class="emails" aria-label="Works with any email">${["Gmail", "Outlook", "Hotmail", "iCloud", "Yahoo", "School email"].map(e => `<span>${e}</span>`).join("")}</div>
-      <p class="small">Works with any email address. <button type="button" class="linkbtn" id="a-guest">Look around first</button></p>`);
+      <p class="small">Works with any email address. <button type="button" class="linkbtn" id="a-guest">Look around first</button> · <button type="button" class="linkbtn" id="a-home">About StudyFlow</button></p>`);
     const f = $("#a-name") || $("#a-email"); if (f && !msg) f.focus();
+  }
+
+  /* ---------- public landing page (signed-out visitors) ---------- */
+  const LAMP = `<svg viewBox="0 0 64 64" width="56" height="56" aria-hidden="true"><defs><radialGradient id="lg" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#FFD48A"/><stop offset="1" stop-color="#FFB648" stop-opacity="0"/></radialGradient></defs><circle cx="32" cy="30" r="26" fill="url(#lg)" opacity=".55"/><path d="M18 30c0-9 6-16 14-16s14 7 14 16z" fill="#FFB648"/><rect x="29" y="30" width="6" height="18" rx="3" fill="#7A6A55"/><rect x="20" y="48" width="24" height="6" rx="3" fill="#7A6A55"/><circle cx="27" cy="24" r="2.2" fill="#261600"/><circle cx="37" cy="24" r="2.2" fill="#261600"/><path d="M28 27.5q4 3 8 0" stroke="#261600" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>`;
+  function drawLanding() {
+    host().hidden = false;
+    host().classList.add("is-landing");
+    const feat = [
+      ["🗓", "A timetable that plans itself", "Add your subjects, tests and activities once. StudyFlow plans study around school, sport and sleep, with prep before every test."],
+      ["↻", "Plans change. So does yours.", "Can't do a session? Tap “Can't now” and it moves to the next free slot. Add a test and the prep appears by itself."],
+      ["✦", "Flo, your study buddy", "Ask for explanations, notes or a plan for your week. Flo is an AI that can make real changes to your plan when you ask."],
+      ["◎", "Guided study sessions", "Flo suggests what to study and for how long, sets one clear goal, and runs a calm focus timer."],
+      ["🃏", "Quizzes and flashcards that come back", "Short quizzes and spaced flashcards bring topics back just before you'd forget them."],
+      ["📚", "A library that knows your subjects", "Free resources for each subject, study guides, and any web page or PDF turned into notes, flashcards or a quiz."]
+    ];
+    const faq = [
+      ["Is StudyFlow free?", "Yes. StudyFlow is free while it's in beta, and everything you see here is included."],
+      ["Which students is it for?", "Students aged 13 and over, from middle school to university. It knows the IB Diploma, A-Levels, IGCSE/GCSE, AP, CBSE and more, and adapts its questions to your stage."],
+      ["Is Flo always right?", "No. Flo is an AI and can make mistakes, so check important facts with your teacher or textbook. Flo never writes coursework for you."],
+      ["What happens to my data?", "Your plan is saved privately to your account so it's on every device. We don't sell your data, and you can delete your account at any time. Read the <a href=\"privacy.html\">Privacy Policy</a>."],
+      ["Does it work on my phone?", "Yes. Open it in your phone's browser and use “Add to Home Screen” to use it like an app."],
+      ["Can I import my school calendar?", "Yes. Add a calendar file or link from ManageBac, iSAMS, Google, Apple, Outlook or Canvas, and tests and deadlines appear in your plan."]
+    ];
+    host().innerHTML = `<div class="lp">
+      <header class="lp-nav"><div class="logo"><i></i>StudyFlow</div><div class="lp-nav-r"><button type="button" class="btn ghost" data-mode="signin">Sign in</button><button type="button" class="btn primary" data-mode="signup">Get started</button></div></header>
+      <section class="lp-hero">
+        <div class="lp-copy">
+          <span class="lp-pill">Free during the beta</span>
+          <h1>The study planner that <em>plans for you.</em></h1>
+          <p>Tell StudyFlow about your subjects, tests and life once. It builds your timetable, reshuffles it when plans change, and helps you actually learn, with Flo, your AI study buddy.</p>
+          <div class="lp-cta"><button type="button" class="btn primary big" data-mode="signup">Get started free</button><button type="button" class="btn big" id="a-guest">Look around first</button></div>
+          <div class="lp-curr">${["IB Diploma", "A-Levels", "IGCSE / GCSE", "AP", "CBSE", "University"].map(c => `<span>${c}</span>`).join("")}</div>
+        </div>
+        <div class="lp-demo" aria-hidden="true">
+          <div class="demo-card">
+            <div class="demo-top"><span>Tuesday</span><b>Good evening, Sara</b></div>
+            <div class="demo-flo">${LAMP}<p>Chemistry test is Friday and kinetics is your weak spot, so tonight is a 45-minute kinetics session. Saturday evening stays free.</p></div>
+            <div class="demo-hero"><small>Today · 5:30 pm · 45 min</small><b>Chemistry</b><span>Rates of reaction: practice questions</span><div class="demo-btns"><i>▶ Start</i><em>Can't now</em></div></div>
+            <div class="demo-days">${["Tue", "Wed", "Thu", "Fri", "Sat"].map((d, i) => `<span class="${i === 0 ? "on" : ""}">${d}<b style="--h:${[60, 75, 40, 90, 25][i]}%"></b></span>`).join("")}</div>
+            <div class="demo-mis"><span>✓ Finish a study session</span><span>✦ Explain a topic to Flo</span></div>
+          </div>
+        </div>
+      </section>
+      <section class="lp-steps"><h2>How it works</h2><ol>
+        <li><b>Answer a few questions</b><span>About two minutes: your subjects, tests, activities and when you work best.</span></li>
+        <li><b>Get your plan</b><span>Study sessions, test prep, weekly reviews and long projects, fitted around your life.</span></li>
+        <li><b>Just follow it</b><span>Start sessions with one tap. If something comes up, StudyFlow moves things for you.</span></li>
+      </ol></section>
+      <section class="lp-feat"><h2>Everything in one place</h2><div class="lp-grid">${feat.map(([i, t, d]) => `<div class="lp-f"><span class="lp-ic">${i}</span><b>${t}</b><p>${d}</p></div>`).join("")}</div></section>
+      <section class="lp-safe"><div><h2>Built for students, with care</h2><ul>
+        <li><b>Private by default.</b> Only you can see your plan. We never sell your data.</li>
+        <li><b>Honest AI.</b> Flo says it's an AI, can make mistakes, and won't write your coursework.</li>
+        <li><b>Healthy limits.</b> Plans include breaks, protect sleep and cap daily study time.</li>
+        <li><b>Ages 13+.</b> Under 18? Check with a parent or guardian before signing up.</li>
+      </ul></div></section>
+      <section class="lp-faq"><h2>Questions</h2>${faq.map(([q, ans]) => `<details><summary>${q}</summary><p>${ans}</p></details>`).join("")}</section>
+      <section class="lp-end">${LAMP}<h2>Ready when you are.</h2><p>It takes about two minutes to set up.</p><button type="button" class="btn primary big" data-mode="signup">Get started free</button></section>
+      <footer class="lp-foot"><div><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a></div>
+        <p>© ${new Date().getFullYear()} StudyFlow. StudyFlow is an independent study tool. It isn't affiliated with or endorsed by the International Baccalaureate Organization, Cambridge, the College Board or any exam board. IB, SAT and other names are trademarks of their owners.</p></footer>
+    </div>`;
   }
   function drawSimple(title, body) { show(`<h1>${title}</h1><div class="auth-card">${body}</div>`); }
 
@@ -171,6 +235,7 @@
     if (t.id === "a-magic") return magic();
     if (t.id === "a-forgot") return forgot();
     if (t.id === "a-back") { msg = null; mode = "signin"; return drawMain(); }
+    if (t.id === "a-home") { msg = null; return drawLanding(); }
     if (t.id === "a-guest") { AUTH.guest = true; hide(); window.SF_boot(null, { guest: true }); setSync("saved"); }
   });
   host()?.addEventListener("submit", async e => {
@@ -225,7 +290,7 @@
     });
     const { data } = await sb.auth.getSession();
     if (data.session && recovering) { AUTH.user = data.session.user; drawReset(); }
-    else if (data.session) enter(data.session.user); else drawMain();
+    else if (data.session) enter(data.session.user); else drawLanding();
   }
   start();
 })();
