@@ -59,7 +59,7 @@
   function setSync(st) {
     const el = $("#syncState"); if (!el) return;
     el.className = "sync " + st;
-    el.innerHTML = `<i></i>${st === "saving" ? "Saving…" : st === "offline" ? "Offline. Will save when you're back." : AUTH.guest ? "Not saved to an account" : "Saved to your account"}`;
+    el.title = st === "saving" ? "Saving…" : st === "offline" ? "Offline" : AUTH.guest ? "Not saved to an account" : "Saved to your account"; el.innerHTML = `<i></i>${st === "saving" ? "Saving…" : st === "offline" ? "Offline. Will save when you're back." : AUTH.guest ? "Not saved to an account" : "Saved to your account"}`;
   }
   window.SF_setSync = setSync;
 

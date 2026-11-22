@@ -742,7 +742,7 @@ details.alt[open] summary{margin-bottom:14px}
 .dp-bar i:last-child{display:none}
 .dayprog span{font-size:13px;color:var(--ink-2);white-space:nowrap}.dayprog span b{color:var(--ink)}
 .dayprog.all .dp-bar b{background:var(--mint)}
-@media(max-width:560px){.dayprog{flex-direction:column;align-items:stretch;gap:6px}}
+@media(max-width:560px){.dayprog{flex-direction:column;align-items:stretch;gap:6px}.dp-bar{flex:none;width:100%}}
 .you-legal{margin-top:18px;text-align:center}.you-legal a{color:var(--ink-2)}
 .lib .sect{margin-top:26px}.lib .sect h3{margin:0 0 10px}
 .lib .page-h h1{font-family:var(--f-display);font-size:clamp(24px,4vw,34px);margin:4px 0 0;line-height:1.1}
@@ -993,7 +993,8 @@ html[data-dir="back"]::view-transition-new(page){animation-name:vt-in-back}
 .auth .small{font-size:13px;color:var(--ink-3);text-align:center}
 .auth .emails{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
 .auth .emails span{font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:2px 9px;color:var(--ink-3)}
-.sync{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-3);padding:0 10px}
+.sync{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-3);padding:0 10px;white-space:nowrap}
+@media(max-width:560px){.sync{font-size:0;gap:0;padding:0 6px}.sync i{width:9px;height:9px}}
 .sync i{width:7px;height:7px;border-radius:50%;background:var(--mint)}
 .sync.saving i{background:var(--lamp);animation:breathe 1.2s infinite}
 .sync.offline i{background:var(--rose)}
