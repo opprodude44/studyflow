@@ -35,6 +35,50 @@ function toText(content) {
   return content.map(b => b.type === "text" ? b.text : b.type === "tool_result" ? `Result: ${typeof b.content === "string" ? b.content : JSON.stringify(b.content)}` : "").filter(Boolean).join("\n");
 }
 
+// ---------- reading web pages (for "Add from a website" and link checks) ----------
+function blockedHost(h) {
+  h = h.toLowerCase();
+  return h === "localhost" || h.endsWith(".local") || h.endsWith(".internal") || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.)/.test(h) || h.includes(":") || /^\d+$/.test(h);
+}
+function decodeEntities(t) {
+  return t.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&#(\d+);/g, (_, n) => { try { return String.fromCodePoint(+n); } catch { return ""; } });
+}
+function htmlToText(html) {
+  const title = decodeEntities((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "").trim()).slice(0, 200);
+  let body = (html.match(/<article[\s\S]*?<\/article>/i) || html.match(/<main[\s\S]*?<\/main>/i) || html.match(/<body[\s\S]*?<\/body>/i) || [html])[0];
+  body = body.replace(/<(script|style|noscript|svg|nav|footer|header|aside|form|iframe)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<(br|\/p|\/div|\/h[1-6]|\/li|\/tr)[^>]*>/gi, "\n").replace(/<h([1-6])[^>]*>/gi, "\n## ").replace(/<li[^>]*>/gi, "\n- ").replace(/<[^>]+>/g, " ");
+  const text = decodeEntities(body).replace(/[ \t]+/g, " ").replace(/\n\s*\n\s*/g, "\n\n").trim();
+  return { title, text };
+}
+async function fetchPage(raw) {
+  let u; try { u = new URL(raw); } catch { return { ok: false, error: "That isn't a valid link." }; }
+  if (!/^https?:$/.test(u.protocol) || blockedHost(u.hostname)) return { ok: false, error: "That link can't be opened." };
+  if (/(^|\.)(youtube\.com|youtu\.be)$/i.test(u.hostname)) return { ok: false, error: "Videos can't be read yet. Paste the notes or transcript instead." };
+  try {
+    const r = await fetch(u.toString(), { redirect: "follow", headers: { "User-Agent": "StudyFlowBot/1.0 (+https://opprodude44.github.io/studyflow/)", "Accept": "text/html,text/plain;q=0.9,*/*;q=0.5" }, signal: AbortSignal.timeout(12000) });
+    if (!r.ok) return { ok: false, status: r.status, error: `That page returned an error (${r.status}).` };
+    const type = r.headers.get("content-type") || "";
+    if (!/text\/html|text\/plain|application\/xhtml/i.test(type)) return { ok: false, error: "Only web pages can be read. For a PDF, download it and add it as a file." };
+    const raw2 = (await r.text()).slice(0, 2_000_000);
+    const { title, text } = /text\/plain/i.test(type) ? { title: u.hostname, text: raw2 } : htmlToText(raw2);
+    if (text.length < 200) return { ok: false, error: "I couldn't find readable text on that page." };
+    return { ok: true, url: r.url, title: title || u.hostname, text: text.slice(0, 40000) };
+  } catch (e) { return { ok: false, error: "That page didn't load. Check the link." }; }
+}
+async function checkLink(raw) {
+  try {
+    const u = new URL(raw); if (!/^https?:$/.test(u.protocol) || blockedHost(u.hostname)) return { url: raw, status: 0 };
+    const r = await fetch(u.toString(), { method: "GET", redirect: "follow", headers: { "User-Agent": "Mozilla/5.0 (compatible; StudyFlowLinkCheck/1.0)" }, signal: AbortSignal.timeout(10000) });
+    const html = (r.headers.get("content-type") || "").includes("html") ? (await r.text()).slice(0, 200000) : "";
+    return { url: raw, status: r.status, final: r.url, title: (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "").trim().slice(0, 140) };
+  } catch (e) { return { url: raw, status: 0, error: String(e?.message || e).slice(0, 80) }; }
+}
+async function signedIn(auth) {
+  const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: auth } });
+  return r.ok;
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || "";
@@ -44,6 +88,14 @@ export default {
 
     const auth = request.headers.get("Authorization") || "";
     if (!auth.startsWith("Bearer ")) return json({ error: "Sign in again" }, 401, origin);
+    const path = new URL(request.url).pathname;
+    if (path === "/read" || path === "/check") {
+      if (!(await signedIn(auth))) return json({ error: "Sign in again" }, 401, origin);
+      let q; try { q = await request.json(); } catch { return json({ error: "Bad request" }, 400, origin); }
+      if (path === "/read") return json(await fetchPage(String(q.url || "")), 200, origin);
+      const urls = (Array.isArray(q.urls) ? q.urls : []).slice(0, 40).map(String);
+      return json({ results: await Promise.all(urls.map(checkLink)) }, 200, origin);
+    }
     // Counts this call for the signed-in person (and proves the sign-in is real).
     const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/bump_ai_usage`, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: auth, "Content-Type": "application/json" }, body: "{}" });
     if (r.status === 401 || r.status === 403) return json({ error: "Sign in again" }, 401, origin);
