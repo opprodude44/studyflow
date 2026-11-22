@@ -74,6 +74,18 @@ async function checkLink(raw) {
     return { url: raw, status: r.status, final: r.url, title: (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "").trim().slice(0, 140) };
   } catch (e) { return { url: raw, status: 0, error: String(e?.message || e).slice(0, 80) }; }
 }
+async function fetchIcs(raw) {
+  let u; try { u = new URL(String(raw).replace(/^webcal:/i, "https:")); } catch { return { ok: false, error: "That isn't a valid calendar link." }; }
+  if (u.protocol !== "https:" || blockedHost(u.hostname)) return { ok: false, error: "That calendar link can't be opened." };
+  try {
+    const r = await fetch(u.toString(), { redirect: "follow", headers: { "User-Agent": "StudyFlow/1.0 (calendar sync)", Accept: "text/calendar,*/*;q=0.5" }, signal: AbortSignal.timeout(15000) });
+    if (r.status === 401 || r.status === 403 || r.status === 404) return { ok: false, error: "The calendar link was refused. It may have expired or been reset; copy a fresh link." };
+    if (!r.ok) return { ok: false, error: `The calendar returned an error (${r.status}).` };
+    const text = (await r.text()).slice(0, 3_000_000);
+    if (!/BEGIN:VCALENDAR/i.test(text)) return { ok: false, error: "That link isn't a calendar feed. Look for the iCal or subscribe link." };
+    return { ok: true, ics: text };
+  } catch { return { ok: false, error: "The calendar didn't respond. Try again later." }; }
+}
 async function signedIn(auth) {
   const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: auth } });
   return r.ok;
@@ -89,10 +101,11 @@ export default {
     const auth = request.headers.get("Authorization") || "";
     if (!auth.startsWith("Bearer ")) return json({ error: "Sign in again" }, 401, origin);
     const path = new URL(request.url).pathname;
-    if (path === "/read" || path === "/check") {
+    if (path === "/read" || path === "/check" || path === "/ics") {
       if (!(await signedIn(auth))) return json({ error: "Sign in again" }, 401, origin);
       let q; try { q = await request.json(); } catch { return json({ error: "Bad request" }, 400, origin); }
       if (path === "/read") return json(await fetchPage(String(q.url || "")), 200, origin);
+      if (path === "/ics") return json(await fetchIcs(q.url || ""), 200, origin);
       const urls = (Array.isArray(q.urls) ? q.urls : []).slice(0, 40).map(String);
       return json({ results: await Promise.all(urls.map(checkLink)) }, 200, origin);
     }
