@@ -58,15 +58,25 @@ export default {
     if (raw.includes('"type":"image"')) return json({ error: "Reading photos is coming soon. Paste the text instead." }, 400, origin);
 
     let msgs = (Array.isArray(body.messages) ? body.messages : []).map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: toText(m.content).slice(0, 40000) })).filter(m => m.content);
-    // The model reads about 24k tokens, so keep the newest messages within ~60k characters.
+    // Chats start with the app's long briefing ("You are Flo...") merged with the student's first message.
+    // Move the briefing into the system prompt so the model treats it as background and answers the student.
+    let appRules = "";
+    if (msgs.length > 1 && msgs[0].role === "user" && /^You are Flo/.test(msgs[0].content)) {
+      const c0 = msgs[0].content, br = c0.lastIndexOf("\n\n");
+      if (br > 0 && c0.length - br < 4000) { appRules = c0.slice(0, br); msgs[0] = { role: "user", content: c0.slice(br + 2) }; }
+      else { appRules = c0; msgs.shift(); }
+    }
+    // The model reads about 24k tokens, so keep the newest messages within ~40k characters.
     let total = 0; const kept = [];
-    for (let i = msgs.length - 1; i >= 0; i--) { total += msgs[i].content.length; if (total > 60000 && kept.length) break; kept.unshift(msgs[i]); }
+    for (let i = msgs.length - 1; i >= 0; i--) { total += msgs[i].content.length; if (total > 40000 && kept.length) break; kept.unshift(msgs[i]); }
     msgs = kept;
+    if (msgs[0]?.role === "assistant") msgs.unshift({ role: "user", content: "(earlier conversation)" });
+    if (!msgs.length) return json({ error: "Bad request" }, 400, origin);
     const last = body.messages?.[body.messages.length - 1];
     const afterTools = Array.isArray(last?.content) && last.content.some(b => b.type === "tool_result");
     const tools = !afterTools && Array.isArray(body.tools) && body.tools.length ? body.tools.slice(0, 12).map(t => ({ name: t.name, description: String(t.description || "").slice(0, 600), parameters: t.input_schema || { type: "object", properties: {} } })) : null;
     if (!msgs.length) return json({ error: "Bad request" }, 400, origin);
-    const system = SAFETY + (body.json ? "\nReply with ONLY valid JSON, no other text and no code fences." : "\nKeep replies short and clear. Use simple Markdown when it helps.");
+    const system = SAFETY + (appRules ? "\n\nBackground about the student and how StudyFlow works:\n" + appRules.slice(0, 20000) + "\n\nAlways answer the student's LATEST message directly. Don't repeat earlier replies." : "") + (body.json ? "\nReply with ONLY valid JSON, no other text and no code fences." : "\nKeep replies short and clear. Use simple Markdown when it helps.");
     const model = MODELS[body.tier] || MODELS.default;
     try {
       const input = { messages: [{ role: "system", content: system + (tools ? "\nYou can change the student's plan with the tools provided. Use a tool when they ask for a change; otherwise just answer." : "") }, ...msgs], max_tokens: body.json ? 2048 : 1024, temperature: 0.3 };
